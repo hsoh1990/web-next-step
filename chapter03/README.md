@@ -19,7 +19,7 @@ Github 우측 상단의 Fork 버튼을 클릭하면 자신의 계정으로 Fork�
 ### 요구사항 1 - http://localhost:8080/index.html로 접속시 응답
 * http://localhost:8080/index.html로 접속했을 떄 webapp 디렉토리에 index.html파일을 읽어 클라이언트에 응답한다.
 * RequestHandler에 InputStream을 한줄 단위로 읽어 HTTP 요청 정보 전체 출력(null값 예외처리)
-    ~~~java
+    ```java
        BufferedReader br = new BufferedReader(new InputStreamReader(in, "UTF-8"));
        String line = br.readLine();
        
@@ -28,24 +28,65 @@ Github 우측 상단의 Fork 버튼을 클릭하면 자신의 계정으로 Fork�
        if (line == null) {
           return;
       }
-    ~~~
+    ```
 * HTTP 요청 정보의 첫 번째 라인에서 요청 URL을 추출
-    ~~~java
+    ```java
       String[] tokens = line.split(" ");
-    ~~~
+    ```
 * 요청 URL을 webapp 디렉토리에서 읽어 전달
-    ~~~java
+    ```java
       DataOutputStream dos = new DataOutputStream(out);
       byte[] body = Files.readAllBytes(new File("./webapp" + tokens[1]).toPath());
       response200Header(dos, body.length);
       responseBody(dos, body);
-    ~~~
+    ```
 ### 요구사항 2 - get 방식으로 회원가입
-* 
+* GET /user/create?userId=admin&password=admin&namem=admin&email=admin HTTP/1.1 요청 처리
+* HTTP 요청의 첫번쨰 라인에서 요청 URL을 추출
+* 이름=값 파싱은 util.httpRequestUtils 클래스의 parseQueryString()를 이용
+* indexOf("?")을 사용해서 path, queryString 분리
+    ```java
+      if ("/user/create".equals(url)) {
+          int index = url.indexOf("?");
+          String requestPath = url.substring(0, index);
+          String queryString = url.substring(index + 1);
+          Map<String, String> parmas = util.HttpRequestUtils.parseQueryString(queryString);
+          User user = new User(parmas.get("userId"), parmas.get("password"), parmas.get("name"), parmas.get("email"));
+      }
+    ```
 
 ### 요구사항 3 - post 방식으로 회원가입
-* 
+* /webapp/user/form.html에 form 태그의 method를 POST로 변경
+* HTTP header에 Content-Length의 값이 있으면 body 존재
+     ```java
+      int contentLength = 0;
 
+      while (!line.equals("")) {  
+        line = br.readLine();
+        log.debug("header : {} ", line);
+        if(line.contains("Content-Length")){
+            contentLength =  getContectLength(line);
+            }  
+      }
+     ```
+     ```java
+      private int getContectLength(String line) {  
+          String[] headerTokens = line.split(":");
+          return Integer.parseInt(headerTokens[1].trim());  
+      }
+     ```
+* Content-length가 있으면 util.IOUtils의 readDate()메소드로 BufferedReader에서 Body를 추출
+
+     ```java
+     if ("/user/create".equals(url)) {
+           String body = IOUtils.readData(br, contentLength);
+           Map<String, String> params = HttpRequestUtils.parseQueryString(body);
+           User user = new User(params.get("userId"), params.get("password"), params.get("name"), params.get("email"));
+           log.debug("User : {}" , user);
+     }
+     ```
+
+     
 ### 요구사항 4 - redirect 방식으로 이동
 * 
 
