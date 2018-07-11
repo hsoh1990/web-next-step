@@ -88,7 +88,24 @@ Github 우측 상단의 Fork 버튼을 클릭하면 자신의 계정으로 Fork�
 
      
 ### 요구사항 4 - redirect 방식으로 이동
-* 
+* 회원가입을 완료하면 index.html로 돌아가도록 변경
+* HTTP 응답 헤더의 status code를 302 Redirect하고 Location을 index.html로 변경
+     ```java
+     DataOutputStream dos = new DataOutputStream(out);
+     response302Header(dos, "/index.html");
+     ```
+     
+     ```java
+     private void response302Header(DataOutputStream dos, String url) {
+             try {
+                 dos.writeBytes("HTTP/1.1 302 Redirect \r\n");
+                 dos.writeBytes("Location: " + url + "\r\n");
+                 dos.writeBytes("\r\n");
+             } catch (IOException e) {
+                 log.error(e.getMessage());
+             }
+         }
+     ```
 
 ### 요구사항 5 - cookie
 * 

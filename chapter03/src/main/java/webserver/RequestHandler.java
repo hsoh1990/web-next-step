@@ -41,8 +41,8 @@ public class RequestHandler extends Thread {
             while (!line.equals("")) {
                 line = br.readLine();
                 log.debug("header : {} ", line);
-                if(line.contains("Content-Length")){
-                    contentLength =  getContectLength(line);
+                if (line.contains("Content-Length")) {
+                    contentLength = getContectLength(line);
                 }
             }
 
@@ -57,7 +57,9 @@ public class RequestHandler extends Thread {
                 String body = IOUtils.readData(br, contentLength);
                 Map<String, String> params = HttpRequestUtils.parseQueryString(body);
                 User user = new User(params.get("userId"), params.get("password"), params.get("name"), params.get("email"));
-                log.debug("User : {}" , user);
+                log.debug("User : {}", user);
+                DataOutputStream dos = new DataOutputStream(out);
+                response302Header(dos, "/index.html");
             } else {
                 DataOutputStream dos = new DataOutputStream(out);
                 byte[] body = Files.readAllBytes(new File(System.getProperty("user.dir") + "/chapter03/webapp" + tokens[1]).toPath());
@@ -80,6 +82,16 @@ public class RequestHandler extends Thread {
             dos.writeBytes("HTTP/1.1 200 OK \r\n");
             dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
             dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
+            dos.writeBytes("\r\n");
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void response302Header(DataOutputStream dos, String url) {
+        try {
+            dos.writeBytes("HTTP/1.1 302 Redirect \r\n");
+            dos.writeBytes("Location: " + url + "\r\n");
             dos.writeBytes("\r\n");
         } catch (IOException e) {
             log.error(e.getMessage());
