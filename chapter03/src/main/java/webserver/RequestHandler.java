@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.util.Map;
 
+import db.DataBase;
 import model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,33 +49,50 @@ public class RequestHandler extends Thread {
 
             String url = tokens[1];
 
-            if ("/user/create".equals(url)) {
-//                int index = url.indexOf("?");
-//                String requestPath = url.substring(0, index);
-//                String queryString = url.substring(index + 1);
-//                Map<String, String> parmas = util.HttpRequestUtils.parseQueryString(queryString);
-//                User user = new User(parmas.get("userId"), parmas.get("password"), parmas.get("name"), parmas.get("email"));
+            if (url.equals("/user/create")) {
                 String body = IOUtils.readData(br, contentLength);
                 Map<String, String> params = HttpRequestUtils.parseQueryString(body);
                 User user = new User(params.get("userId"), params.get("password"), params.get("name"), params.get("email"));
                 log.debug("User : {}", user);
+                DataBase.addUser(user); //TODO  유효성 검사
                 DataOutputStream dos = new DataOutputStream(out);
                 response302Header(dos, "/index.html");
-            } else {
-                DataOutputStream dos = new DataOutputStream(out);
-                byte[] body = Files.readAllBytes(new File(System.getProperty("user.dir") + "/chapter03/webapp" + tokens[1]).toPath());
-                response200Header(dos, body.length);
-                responseBody(dos, body);
-            }
+            } else if (url.equals("/user/login")) {
+                String body = IOUtils.readData(br, contentLength);
+                Map<String, String> params = HttpRequestUtils.parseQueryString(body);
+                User user = DataBase.findUserById(params.get("userId"));
+                if (user == null) {
+                    responseResource(out, "/user/login_failed.html");
+                    return;
+                }
 
+                if (user.getPassword().equals(params.get("password"))) {
+                    DataOutputStream dos = new DataOutputStream(out);
+                    response302LoginSuccessHeader(dos);
+                } else {
+                    responseResource(out, "/user/login_failed.html");
+                }
+            } else {
+                responseResource(out, url);
+            }
         } catch (IOException e) {
             log.error(e.getMessage());
         }
     }
 
+
     private int getContectLength(String line) {
         String[] headerTokens = line.split(":");
         return Integer.parseInt(headerTokens[1].trim());
+    }
+
+    private void responseResource(OutputStream outputStream, String url) throws IOException {
+        DataOutputStream dos = new DataOutputStream(outputStream);
+        byte[] body = Files.readAllBytes(
+                new File(System.getProperty("user.dir") + "/chapter03/webapp" + url).toPath()
+        );
+        response200Header(dos, body.length);
+        responseBody(dos, body);
     }
 
     private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
@@ -92,6 +110,17 @@ public class RequestHandler extends Thread {
         try {
             dos.writeBytes("HTTP/1.1 302 Redirect \r\n");
             dos.writeBytes("Location: " + url + "\r\n");
+            dos.writeBytes("\r\n");
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void response302LoginSuccessHeader(DataOutputStream dos) {
+        try {
+            dos.writeBytes("HTTP/1.1 302 Redirect \r\n");
+            dos.writeBytes("Set-Cookie: logined=true \r\n");
+            dos.writeBytes("Location: /index.html \r\n");
             dos.writeBytes("\r\n");
         } catch (IOException e) {
             log.error(e.getMessage());
