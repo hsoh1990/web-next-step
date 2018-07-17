@@ -163,7 +163,10 @@ Github 우측 상단의 Fork 버튼을 클릭하면 자신의 계정으로 Fork�
          responseBody(dos, body);  
       }
     ```
-### 요구사항 6 - stylesheet 적용
+### 요구사항 6 - 사용자 목록 출력
+* 
+
+### 요구사항 7 - CSS 지원하기
 * 
 
 ### heroku 서버에 배포 후
