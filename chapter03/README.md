@@ -108,8 +108,61 @@ Github 우측 상단의 Fork 버튼을 클릭하면 자신의 계정으로 Fork�
      ```
 
 ### 요구사항 5 - cookie
-* 
+* 로그인 성공시 HTTP 응답 헤더에 Set-Cookie를 추가하여 성공 여부를 전달(Set-Cookie: logined=true)  
+다음과 같은 응답을 받은 브라우저는 HTTP 요 헤더에 Cookie값으로 전달하여 로그인 유무 판단(Cookie: logined=true)
 
+    ```java
+      private void response302LoginSuccessHeader(DataOutputStream dos) {
+              try {
+                  dos.writeBytes("HTTP/1.1 302 Redirect \r\n");
+                  dos.writeBytes("Set-Cookie: logined=true \r\n");
+                  dos.writeBytes("Location: /index.html \r\n");
+                  dos.writeBytes("\r\n");
+              } catch (IOException e) {
+                  log.error(e.getMessage());
+              }
+          }
+
+    ```
+    
+* DataBase.addUser() 메소드를 통해 로그인 정보를 유지하며, 아이디와 비번을 확인한 후 Set-Cookie값을 logined=true, logined=false로 설정
+    ```java
+     public void run() {
+       ...
+       if (url.equals("/user/create")) {
+              ...
+              DataBase.addUser(user); //회원가입 정보유지  
+        } else if (url.equals("/user/login")) {
+              String body = IOUtils.readData(br, contentLength);
+              Map<String, String> params = HttpRequestUtils.parseQueryString(body);
+              User user = DataBase.findUserById(params.get("userId"));
+              if (user == null) {
+                  responseResource(out, "/user/login_failed.html"); //아이디로 찾은 유저가 없으면 실패 리턴
+                  return;
+              }
+         
+              if (user.getPassword().equals(params.get("password"))) {
+                  DataOutputStream dos = new DataOutputStream(out);
+                  response302LoginSuccessHeader(dos);
+              } else {
+                  responseResource(out, "/user/login_failed.html");
+              }
+        } else {
+           responseResource(out, url);
+        }
+          ...
+     }
+    ```
+    ```java
+     private void responseResource(OutputStream outputStream, String url) throws IOException {
+         DataOutputStream dos = new DataOutputStream(outputStream);
+         byte[] body = Files.readAllBytes(
+                 new File(System.getProperty("user.dir") + "/chapter03/webapp" + url).toPath()
+         );
+         response200Header(dos, body.length);
+         responseBody(dos, body);  
+      }
+    ```
 ### 요구사항 6 - stylesheet 적용
 * 
 
