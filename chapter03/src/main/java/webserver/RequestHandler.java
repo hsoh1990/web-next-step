@@ -3,6 +3,7 @@ package webserver;
 import java.io.*;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.util.Collection;
 import java.util.Map;
 
 import db.DataBase;
@@ -38,42 +39,83 @@ public class RequestHandler extends Thread {
 
             String[] tokens = line.split(" ");
             int contentLength = 0;
+            Boolean logined = false;
 
             while (!line.equals("")) {
                 line = br.readLine();
                 log.debug("header : {} ", line);
                 if (line.contains("Content-Length")) {
-                    contentLength = getContectLength(line);
+                    contentLength = getContentLength(line);
+                }
+                if (line.contains("Cookie")) {
+                    logined = isLogin(line);
                 }
             }
 
             String url = tokens[1];
 
-            if (url.equals("/user/create")) {
-                String body = IOUtils.readData(br, contentLength);
-                Map<String, String> params = HttpRequestUtils.parseQueryString(body);
-                User user = new User(params.get("userId"), params.get("password"), params.get("name"), params.get("email"));
-                log.debug("User : {}", user);
-                DataBase.addUser(user); //TODO  유효성 검사
-                DataOutputStream dos = new DataOutputStream(out);
-                response302Header(dos, "/index.html");
-            } else if (url.equals("/user/login")) {
-                String body = IOUtils.readData(br, contentLength);
-                Map<String, String> params = HttpRequestUtils.parseQueryString(body);
-                User user = DataBase.findUserById(params.get("userId"));
-                if (user == null) {
-                    responseResource(out, "/user/login_failed.html");
-                    return;
-                }
+            switch (url) {
+                case "/user/create": {
+                    String body = IOUtils.readData(br, contentLength);
+                    Map<String, String> params = HttpRequestUtils.parseQueryString(body);
+                    User user = new User(params.get("userId"), params.get("password"), params.get("name"), params.get("email"));
+                    log.debug("User : {}", user);
+                    DataBase.addUser(user); //TODO  유효성 검사
 
-                if (user.getPassword().equals(params.get("password"))) {
                     DataOutputStream dos = new DataOutputStream(out);
-                    response302LoginSuccessHeader(dos);
-                } else {
-                    responseResource(out, "/user/login_failed.html");
+                    response302Header(dos, "/index.html");
+                    break;
                 }
-            } else {
-                responseResource(out, url);
+                case "/user/login": {
+                    String body = IOUtils.readData(br, contentLength);
+                    Map<String, String> params = HttpRequestUtils.parseQueryString(body);
+                    User user = DataBase.findUserById(params.get("userId"));
+                    if (user == null) {
+                        responseResource(out, "/user/login_failed.html");
+                        return;
+                    }
+
+                    if (user.getPassword().equals(params.get("password"))) {
+                        DataOutputStream dos = new DataOutputStream(out);
+                        response302LoginSuccessHeader(dos);
+                    } else {
+                        responseResource(out, "/user/login_failed.html");
+                    }
+                    break;
+                }
+                case "/user/list": {
+                    if (!logined){
+                        responseResource(out, "/user/login.html");
+                        return;
+                    }
+
+                    Collection<User> users = DataBase.findAll();
+                    StringBuilder sb = new StringBuilder("this");
+                    sb.append("<table border='1'>");
+                    for (User user: users) {
+                        sb.append("<tr>");
+                        sb.append("<td>" + user.getUserId() + "</td>");
+                        sb.append("<td>" + user.getName() + "</td>");
+                        sb.append("<td>" + user.getEmail() + "</td>");
+                        sb.append("</tr>");
+                    }
+                    sb.append("</table>");
+                    byte[] body = sb.toString().getBytes();
+                    DataOutputStream dos = new DataOutputStream(out);
+                    response200Header(dos, body.length);
+                    responseBody(dos, body);
+                }
+                default:
+                    responseResource(out, url);
+                    break;
+            }
+            if(url.endsWith(".css")) {
+                DataOutputStream dos = new DataOutputStream(out);
+                byte[] body = Files.readAllBytes(
+                        new File(System.getProperty("user.dir") + "/chapter03/webapp" + url).toPath()
+                );
+                response200CssHeader(dos, body.length);
+                responseBody(dos, body);
             }
         } catch (IOException e) {
             log.error(e.getMessage());
@@ -81,7 +123,7 @@ public class RequestHandler extends Thread {
     }
 
 
-    private int getContectLength(String line) {
+    private int getContentLength(String line) {
         String[] headerTokens = line.split(":");
         return Integer.parseInt(headerTokens[1].trim());
     }
@@ -99,6 +141,17 @@ public class RequestHandler extends Thread {
         try {
             dos.writeBytes("HTTP/1.1 200 OK \r\n");
             dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
+            dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
+            dos.writeBytes("\r\n");
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void response200CssHeader(DataOutputStream dos, int lengthOfBodyContent) {
+        try {
+            dos.writeBytes("HTTP/1.1 200 OK \r\n");
+            dos.writeBytes("Content-Type: text/css;\r\n");
             dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
             dos.writeBytes("\r\n");
         } catch (IOException e) {
@@ -125,6 +178,16 @@ public class RequestHandler extends Thread {
         } catch (IOException e) {
             log.error(e.getMessage());
         }
+    }
+
+    private Boolean isLogin(String line){
+        String[] headerTokens = line.split(":");
+        Map<String, String> parseCookies = HttpRequestUtils.parseCookies(headerTokens[1].trim());
+        String value = parseCookies.get("logined");
+        if(value == null){
+            return false;
+        }
+        return Boolean.parseBoolean(value);
     }
 
     private void responseBody(DataOutputStream dos, byte[] body) {
