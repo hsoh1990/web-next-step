@@ -164,10 +164,66 @@ Github 우측 상단의 Fork 버튼을 클릭하면 자신의 계정으로 Fork�
       }
     ```
 ### 요구사항 6 - 사용자 목록 출력
-* 
-
+* 로그인 여부를 판단하기 위해 Cookie 값을 파싱 (util.HttpRequestUtils의 parseCookies()함수 사용)
+* Cookie값을 Boolean으로 변환(Boolean.parseBoolean()함수 사용)
+    ```java
+     while (!line.equals("")) {  
+         ...
+            
+         if (line.contains("Cookie")) {
+             logined = isLogin(line);
+         }  
+      }
+     ...
+      private boolean isLogin(String line) {
+           String[] headerTokens = line.split(":");
+           Map<String, String> cookies = HttpRequestUtils.parseCookies(headerTokens[1].trim());
+           String value = cookies.get("logined");
+           if (value == null) {
+               return false;
+           }
+           return Boolean.parseBoolean(value);
+      }
+    ```
+* 사용자 목록을 출력하는 HTML을 동적으로 생성하여 응답 (StringBuilder 사용)
+     ```java
+      ...
+      if (url.equals("/user/list")) {
+          if (!logined) {
+              responseResource(out, "/user/login.html");
+              return;
+          }
+     
+          Collection<User> users = DataBase.findAll();
+          StringBuilder sb = new StringBuilder();
+          sb.append("<table border='1'>");
+          for (User user : users) {
+              sb.append("<tr>");
+              sb.append("<td>" + user.getUserId() + "</td>");
+              sb.append("<td>" + user.getName() + "</td>");
+              sb.append("<td>" + user.getEmail() + "</td>");
+              sb.append("</tr>");
+          }
+          sb.append("</table>");
+          byte[] body = sb.toString().getBytes();
+          DataOutputStream dos = new DataOutputStream(out);
+          response200Header(dos, body.length);
+          responseBody(dos, body);
+      } 
+    
+     ```
 ### 요구사항 7 - CSS 지원하기
-* 
-
-### heroku 서버에 배포 후
-* 
+* HTTP 헤더에 Accept:text/css,\*/\*;q=0.1을 처리해야지만 CSS정상 동작
+    ```java
+    ...
+    if (url.endsWith(".css")) {
+        responseCssResource(out, url);
+    } 
+    ...
+    private void responseCssResource(OutputStream out, String url) throws IOException {
+        DataOutputStream dos = new DataOutputStream(out);
+        byte[] body = Files.readAllBytes(new File(System.getProperty("user.dir") + "/chapter03/webapp" + url).toPath());
+        response200CssHeader(dos, body.length);
+        responseBody(dos, body);
+    }
+    ``` 
